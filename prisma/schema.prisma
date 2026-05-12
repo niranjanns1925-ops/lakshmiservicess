@@ -1,0 +1,154 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id                 String        @id @default(uuid())
+  email              String        @unique
+  passwordHash       String
+  role               String        // 'admin' or 'user'
+  fullName           String
+  phone              String?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  isActive           Boolean       @default(true)
+  twoFactorEnabled   Boolean       @default(false)
+  
+  services           Service[]
+  requisitions       Requisition[]
+  documents          Document[]
+  auditLogs          AuditLog[]
+  notifications      Notification[]
+  messagesSent       Message[]     @relation("MessagesSent")
+}
+
+model Service {
+  id                 String        @id @default(uuid())
+  name               String
+  description        String
+  category           String
+  price              Float
+  feeStructure       String        // Stored as JSON string in sqlite
+  requirements       String        // Stored as JSON string
+  workflowSteps      String        // Stored as JSON string
+  isActive           Boolean       @default(true)
+  
+  createdBy          String
+  user               User          @relation(fields: [createdBy], references: [id])
+  
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  requisitions       Requisition[]
+}
+
+model Requisition {
+  id                 String        @id @default(uuid())
+  userId             String
+  user               User          @relation(fields: [userId], references: [id])
+  
+  serviceId          String
+  service            Service       @relation(fields: [serviceId], references: [id])
+  
+  status             String        // 'draft', 'submitted', 'under_review', 'approved', 'rejected', 'completed', 'cancelled'
+  
+  submittedAt        DateTime?
+  reviewedAt         DateTime?
+  completedAt        DateTime?
+  
+  metadata           String?       // JSON string
+  notes              String?
+  
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  documents          Document[]
+  payments           Payment[]
+  messages           Message[]
+}
+
+model Document {
+  id                 String        @id @default(uuid())
+  requisitionId      String
+  requisition        Requisition   @relation(fields: [requisitionId], references: [id])
+  
+  fileName           String
+  fileType           String
+  fileSize           Int
+  storageUrl         String
+  
+  uploadedBy         String
+  user               User          @relation(fields: [uploadedBy], references: [id])
+  
+  uploadedAt         DateTime      @default(now())
+  isVerified         Boolean       @default(false)
+  verificationNotes  String?
+}
+
+model Payment {
+  id                     String        @id @default(uuid())
+  requisitionId          String
+  requisition            Requisition   @relation(fields: [requisitionId], references: [id])
+  
+  amount                 Float
+  currency               String
+  paymentMethod          String
+  transactionId          String?
+  status                 String        // 'pending', 'completed', 'failed', 'refunded'
+  paymentGatewayResponse String?       // JSON string
+  receiptUrl             String?
+  
+  createdAt              DateTime      @default(now())
+  updatedAt              DateTime      @updatedAt
+}
+
+model AuditLog {
+  id                 String        @id @default(uuid())
+  userId             String
+  user               User          @relation(fields: [userId], references: [id])
+  
+  action             String
+  entityType         String
+  entityId           String
+  oldValues          String?       // JSON
+  newValues          String?       // JSON
+  ipAddress          String?
+  userAgent          String?
+  
+  timestamp          DateTime      @default(now())
+}
+
+model Notification {
+  id                 String        @id @default(uuid())
+  userId             String
+  user               User          @relation(fields: [userId], references: [id])
+  
+  type               String
+  title              String
+  message            String
+  isRead             Boolean       @default(false)
+  
+  createdAt          DateTime      @default(now())
+}
+
+model Message {
+  id                 String        @id @default(uuid())
+  requisitionId      String
+  requisition        Requisition   @relation(fields: [requisitionId], references: [id])
+  
+  senderId           String
+  sender             User          @relation("MessagesSent", fields: [senderId], references: [id])
+  
+  content            String
+  isRead             Boolean       @default(false)
+  readAt             DateTime?
+  
+  createdAt          DateTime      @default(now())
+}
